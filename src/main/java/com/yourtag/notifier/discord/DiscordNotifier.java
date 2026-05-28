@@ -10,7 +10,7 @@ import java.awt.Color;
 import java.time.Instant;
 
 /**
- * JDA kullanarak Discord'a bağlanır ve bildirim gönderir.
+ * Connects to Discord via JDA and sends video notifications.
  */
 public class DiscordNotifier {
 
@@ -18,7 +18,7 @@ public class DiscordNotifier {
     private final String channelId;
 
     public DiscordNotifier(String botToken, String channelId) throws InterruptedException {
-        System.out.println("[Discord] Bot başlatılıyor...");
+        System.out.println("[Discord] Starting bot...");
 
         this.jda = JDABuilder.createDefault(botToken)
                 .enableIntents(GatewayIntent.GUILD_MESSAGES)
@@ -27,35 +27,35 @@ public class DiscordNotifier {
         this.jda.awaitReady();
         this.channelId = channelId;
 
-        System.out.println("[Discord] ✅ Bağlandı → " + jda.getSelfUser().getAsTag());
+        System.out.println("[Discord] ✅ Connected → " + jda.getSelfUser().getAsTag());
     }
 
     /**
-     * Discord kanalına embed bildirim gönderir.
+     * Sends an embed notification to the Discord channel.
      */
     public void sendNotification(String message, String videoUrl) {
         TextChannel channel = jda.getTextChannelById(channelId);
 
         if (channel == null) {
-            System.err.println("[Discord] ❌ Kanal bulunamadı! ID: " + channelId);
+            System.err.println("[Discord] ❌ Channel not found! ID: " + channelId);
             return;
         }
 
         EmbedBuilder embed = new EmbedBuilder()
-                .setTitle("📺 Yeni Video Yayınlandı!", videoUrl)
-                .setDescription(message + "\n\n🔗 **İzlemek için tıkla:** " + videoUrl)
+                .setTitle("📺 New Video Just Dropped!", videoUrl)
+                .setDescription(message + "\n\n🔗 **Click to watch:** " + videoUrl)
                 .setColor(Color.RED)
                 .setTimestamp(Instant.now())
                 .setFooter("YouTube Notifier Bot");
 
         channel.sendMessageEmbeds(embed.build()).queue(
-                success -> System.out.println("[Discord] ✅ Bildirim gönderildi!"),
-                error   -> System.err.println("[Discord] ❌ Gönderim hatası: " + error.getMessage())
+                success -> System.out.println("[Discord] ✅ Notification sent!"),
+                error   -> System.err.println("[Discord] ❌ Failed to send: " + error.getMessage())
         );
     }
 
     public void shutdown() {
-        System.out.println("[Discord] Bot kapatılıyor...");
+        System.out.println("[Discord] Shutting down bot...");
         jda.shutdown();
     }
 }
