@@ -9,34 +9,31 @@ import java.io.IOException;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.List;
 
 /**
- * YouTube kanalının RSS feed'ini periyodik olarak kontrol eder.
- * API key gerektirmez — herkese açık RSS endpoint kullanır.
- *
- * Railway notu: Cache dosyası /tmp dizinine yazılır.
- * Railway her deploy'da container'ı sıfırlar, bu yüzden /tmp kullanılır.
- * (Deploy anında en fazla 1 tekrar bildirim gönderebilir — normaldir.)
+ * Checks YouTube channel RSS feed for new videos.
+ * Uses persistent memory instead of filesystem cache (more reliable on Railway).
  */
 public class YouTubePoller {
 
     private static final String RSS_BASE_URL =
             "https://www.youtube.com/feeds/videos.xml?channel_id=";
 
-    // Railway container'ında yazılabilir geçici dizin
-    private static final String CACHE_FILE = "/tmp/last_video.txt";
-
     private final String channelId;
+    private String lastVideoId = ""; // In-memory cache
 
     public YouTubePoller(String channelId) {
         this.channelId = channelId;
+        // Try to load from file if it exists
+        loadCacheFromFile();
     }
 
     /**
-     * YouTube RSS feed'ini çeker ve en son videoyu kontrol eder.
+     * Checks YouTube RSS feed for new videos.
      *
-     * @return Yeni video varsa URL'si, yoksa null
+     * @return New video URL if found, null otherwise
      */
     public String checkForNewVideo() {
         try {
@@ -47,28 +44,32 @@ public class YouTubePoller {
 
             List<SyndEntry> entries = feed.getEntries();
             if (entries == null || entries.isEmpty()) {
-                System.out.println("[YouTube] Feed boş döndü.");
+                System.out.println("[YouTube] Feed is empty.");
                 return null;
             }
 
-            // İlk entry = en yeni video
+            // First entry = newest video
             SyndEntry latestEntry = entries.get(0);
             String latestUrl   = latestEntry.getLink();
             String latestId    = extractVideoId(latestUrl);
             String latestTitle = latestEntry.getTitle();
 
-            String cachedId = readCache();
+            System.out.println("[YouTube] Latest video ID: " + latestId);
+            System.out.println("[YouTube] Cached video ID:  " + lastVideoId);
 
-            if (!latestId.equals(cachedId)) {
-                writeCache(latestId);
-                System.out.println("[YouTube] ✅ Yeni video: " + latestTitle + " → " + latestUrl);
+            if (!latestId.equals(lastVideoId) && !latestId.isEmpty()) {
+                // New video detected!
+                lastVideoId = latestId;
+                saveCacheToFile(latestId); // Save for next restart
+                System.out.println("[YouTube] ✅ New video found: " + latestTitle + " → " + latestUrl);
                 return latestUrl;
             } else {
-                System.out.println("[YouTube] Yeni video yok. Son: " + latestTitle);
+                System.out.println("[YouTube] No new videos. Latest: " + latestTitle);
             }
 
         } catch (Exception e) {
-            System.err.println("[YouTube] ❌ Feed hatası: " + e.getMessage());
+            System.err.println("[YouTube] ❌ Feed check error: " + e.getMessage());
+            e.printStackTrace();
         }
 
         return null;
@@ -81,19 +82,30 @@ public class YouTubePoller {
         return url;
     }
 
-    private String readCache() {
+    /**
+     * Load last video ID from file (if it exists from previous run)
+     */
+    private void loadCacheFromFile() {
         try {
-            return Files.readString(Path.of(CACHE_FILE)).trim();
+            String cached = Files.readString(Path.of("/tmp/last_video.txt")).trim();
+            if (!cached.isEmpty()) {
+                lastVideoId = cached;
+                System.out.println("[Cache] Loaded from file: " + lastVideoId);
+            }
         } catch (IOException e) {
-            return ""; // Dosya yok = ilk çalışma
+            System.out.println("[Cache] No cache file found (first run).");
         }
     }
 
-    private void writeCache(String videoId) {
+    /**
+     * Save last video ID to file (persistent storage)
+     */
+    private void saveCacheToFile(String videoId) {
         try {
-            Files.writeString(Path.of(CACHE_FILE), videoId);
+            Files.writeString(Path.of("/tmp/last_video.txt"), videoId);
+            System.out.println("[Cache] Saved to file: " + videoId);
         } catch (IOException e) {
-            System.err.println("[Cache] Yazma hatası: " + e.getMessage());
+            System.err.println("[Cache] Failed to save: " + e.getMessage());
         }
     }
 }
