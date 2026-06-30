@@ -16,4 +16,9 @@ WORKDIR /app
 
 COPY --from=builder /app/target/discord-youtube-notifier-1.0.0.jar app.jar
 
-CMD ["java", "-Dhttps.protocols=TLSv1.2,TLSv1.3", "-jar", "app.jar"]
+# SSL/TLS güvenlik protokolü açıkça tanımla
+CMD ["java", \
+     "-Dhttps.protocols=TLSv1.2,TLSv1.3", \
+     "-Djdk.tls.client.protocols=TLSv1.2,TLSv1.3", \
+     "-Dcom.sun.jndi.ldap.connect.pool=false", \
+     "-jar", "app.jar"]
