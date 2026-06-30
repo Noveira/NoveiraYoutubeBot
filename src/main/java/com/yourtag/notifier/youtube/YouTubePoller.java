@@ -8,7 +8,8 @@ import com.rometools.rome.feed.synd.SyndFeed;
 import com.rometools.rome.io.SyndFeedInput;
 import com.rometools.rome.io.XmlReader;
 
-import java.io.StringReader;
+import java.io.ByteArrayInputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -61,9 +62,11 @@ public class YouTubePoller {
                 String feedContent = response.body().string();
                 System.out.println("[YouTube] Feed downloaded successfully (" + feedContent.length() + " bytes)");
 
-                // Parse RSS feed
+                // Parse RSS feed from string
                 SyndFeedInput input = new SyndFeedInput();
-                SyndFeed feed = input.build(new XmlReader(new StringReader(feedContent)));
+                SyndFeed feed = input.build(new XmlReader(
+                        new ByteArrayInputStream(feedContent.getBytes(StandardCharsets.UTF_8))
+                ));
 
                 List<SyndEntry> entries = feed.getEntries();
                 if (entries == null || entries.isEmpty()) {
